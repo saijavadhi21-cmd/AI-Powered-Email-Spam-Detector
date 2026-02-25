@@ -1,0 +1,20 @@
+[
+  {
+    "subject": "Win a FREE iPhone now",
+    "sender": "promo@scam.example",
+    "date": "2026-02-20",
+    "body": "Congratulations! You have been selected to win a free iPhone. Click http://phish.example to claim."
+  },
+  {
+    "subject": "Meeting notes",
+    "sender": "alice@example.com",
+    "date": "2026-02-21",
+    "body": "Here are the meeting notes from today's sync. Please review the attached doc and let me know your thoughts."
+  },
+  {
+    "subject": "Your invoice is ready",
+    "sender": "billing@service.com",
+    "date": "2026-02-22",
+    "body": "Your invoice for February is available. View it securely at https://service.example/invoice/12345"
+  }
+]

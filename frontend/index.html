@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gmail Spam Detector - Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body class="p-4">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center">
+        <h1>Gmail Spam Detector</h1>
+        <div>
+          <a href="/login" class="btn btn-outline-primary">Login with Google</a>
+          <button id="logoutBtn" class="btn btn-outline-secondary">Logout</button>
+        </div>
+      </div>
+      <p class="text-muted">Authenticate with Google to fetch real emails, or use demo/mock data.</p>
+
+      <div class="row">
+        <div class="col-md-8">
+          <div class="mb-3">
+            <button id="fetchBtn" class="btn btn-primary">Fetch Emails</button>
+            <button id="analyzeBtn" class="btn btn-success">Analyze Fetched</button>
+          </div>
+          <table class="table table-striped" id="emailsTable">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Sender</th>
+                <th>Probability</th>
+                <th>Risk</th>
+                <th>Suspicious</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="col-md-4">
+          <h5>Analytics</h5>
+          <canvas id="pieChart" width="300" height="300"></canvas>
+          <h6 class="mt-3">Top Spam Keywords</h6>
+          <ul id="topKeywords"></ul>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      let emails = [];
+      const fetchBtn = document.getElementById('fetchBtn');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const tbody = document.querySelector('#emailsTable tbody');
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      let pieChart = null;
+
+      fetchBtn.onclick = async () => {
+        const res = await fetch('/fetch-emails');
+        const data = await res.json();
+        emails = data.emails || [];
+        renderEmails([]);
+      };
+
+      analyzeBtn.onclick = async () => {
+        if (!emails.length) { alert('Fetch emails first'); return; }
+        const res = await fetch('/analyze', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({emails})
+        });
+        const data = await res.json();
+        const results = data.results || [];
+        renderEmails(results);
+        const stats = await (await fetch('/dashboard')).json();
+        renderAnalytics(stats);
+      };
+
+      logoutBtn.onclick = async () => {
+        await fetch('/logout');
+        alert('Logged out');
+      };
+
+      function renderEmails(results) {
+        tbody.innerHTML = '';
+        if (!results.length) {
+          // show subjects only as fallback
+          emails.forEach(e => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${escapeHtml(e.subject||'')}</td><td>${escapeHtml(e.sender||'')}</td><td>—</td><td>—</td><td>—</td>`;
+            tbody.appendChild(tr);
+          });
+          return;
+        }
+        results.forEach(r => {
+          const tr = document.createElement('tr');
+          const prob = (r.probability||0).toFixed(2);
+          const badgeClass = r.risk === 'high' ? 'danger' : (r.risk === 'medium' ? 'warning' : 'success');
+          const suspicious = (r.suspicious_words || []).map(w => `<span class="badge bg-secondary me-1">${escapeHtml(w)}</span>`).join('');
+          tr.innerHTML = `<td>${escapeHtml(r.subject||'')}</td><td>${escapeHtml(r.sender||'')}</td><td>${prob}</td><td><span class="badge bg-${badgeClass}">${r.risk}</span></td><td>${suspicious}</td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderAnalytics(stats) {
+        const total = stats.total_emails || 0;
+        const spam = stats.spam_count || 0;
+        const notspam = total - spam;
+        const top = stats.top_keywords || [];
+        document.getElementById('topKeywords').innerHTML = top.map(t => `<li>${escapeHtml(t[0])} (${t[1]})</li>`).join('');
+        if (pieChart) pieChart.destroy();
+        pieChart = new Chart(pieCtx, {
+          type: 'pie',
+          data: {
+            labels: ['Not Spam','Spam'],
+            datasets: [{data: [notspam, spam], backgroundColor: ['#4caf50','#f44336']}]
+          }
+        });
+      }
+
+      function escapeHtml(text){
+        return (text||'').replace(/[&"'<>]/g, c => ({'&':'&amp;','"':'&quot;','\'':'&#39;','<':'&lt;','>':'&gt;'})[c]);
+      }
+    </script>
+  </body>
+</html>
