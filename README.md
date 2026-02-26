@@ -8,6 +8,8 @@ Production-ready Flask + Bootstrap application for classifying Gmail messages as
 - ✅ Better analytics payloads for frontend rendering.
 - ✅ Upgraded, attractive dashboard UI.
 - ✅ Expanded training dataset to improve baseline quality.
+- ✅ Deployment-ready app entrypoint (`backend/wsgi.py`) + `Procfile` + `Dockerfile`.
+- ✅ Environment-driven production settings (`.env.example`).
 
 ## Quick Start (Local)
 
@@ -57,13 +59,36 @@ export CLIENT_SECRETS_FILE=/absolute/path/client_secrets.json
 
 4. Run server and open `/login`.
 
-## Deployment Checklist
+## Production Deployment
 
-- Set `FLASK_SECRET` to a secure random value.
-- Set restrictive `CORS_ORIGINS`.
-- Run with a production WSGI server (`gunicorn`/`uwsgi`).
-- Configure HTTPS and reverse proxy.
-- Keep OAuth secrets outside repository.
+### Option A: Gunicorn (VM / Render / Railway / Heroku-style)
+
+1. Create and configure environment variables (copy from `.env.example`).
+2. Train model once and ensure artifacts exist:
+
+```bash
+python training/train_model.py
+```
+
+3. Start service:
+
+```bash
+gunicorn -w 2 -k gthread -b 0.0.0.0:${PORT:-5000} backend.wsgi:app
+```
+
+### Option B: Docker
+
+```bash
+docker build -t gmail-spam-detector .
+docker run --env-file .env -p 5000:5000 gmail-spam-detector
+```
+
+### Required production env vars
+
+- `FLASK_SECRET` (strong random secret)
+- `CORS_ORIGINS` (your frontend domain)
+- `CLIENT_SECRETS_FILE` (absolute path in runtime)
+- `RATE_LIMIT_STORAGE_URI` (Redis URL, e.g. `redis://host:6379/0`)
 
 ## Model details
 

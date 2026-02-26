@@ -22,19 +22,34 @@ MODEL_DIR = BASE_DIR / 'model'
 MODEL_PATH = MODEL_DIR / 'spam_model.pkl'
 VECT_PATH = MODEL_DIR / 'vectorizer.pkl'
 
-
-app = Flask(__name__, static_folder=str(BASE_DIR.parent / 'frontend'))
-app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-change-me')
-app.config['SESSION_TYPE'] = 'filesystem'
-Session(app)
-
-CORS(app, origins=os.environ.get('CORS_ORIGINS', '*'))
-limiter = Limiter(key_func=get_remote_address, default_limits=['200 per day', '50 per hour'])
-limiter.init_app(app)
-app.register_blueprint(auth_bp)
-
 model = None
 vectorizer = None
+
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=['200 per day', '50 per hour'],
+)
+
+
+def create_app() -> Flask:
+    app = Flask(__name__, static_folder=str(BASE_DIR.parent / 'frontend'))
+    app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-change-me')
+    app.config['SESSION_TYPE'] = os.environ.get('SESSION_TYPE', 'filesystem')
+    app.config['SESSION_FILE_DIR'] = os.environ.get('SESSION_FILE_DIR', str(BASE_DIR.parent / 'flask_session'))
+    app.config['SESSION_PERMANENT'] = False
+    app.config['PERMANENT_SESSION_LIFETIME'] = int(os.environ.get('SESSION_TTL_SECONDS', '3600'))
+
+    limiter_storage = os.environ.get('RATE_LIMIT_STORAGE_URI', 'memory://')
+    app.config['RATELIMIT_STORAGE_URI'] = limiter_storage
+
+    Session(app)
+    CORS(app, origins=os.environ.get('CORS_ORIGINS', '*'))
+    limiter.init_app(app)
+    app.register_blueprint(auth_bp)
+
+    register_routes(app)
+    return app
 
 
 def load_model(force_reload: bool = False):
@@ -117,76 +132,75 @@ def _dashboard_from_results(results):
     }
 
 
-@app.route('/')
-def serve_frontend():
-    return send_from_directory(app.static_folder, 'index.html')
+def register_routes(app: Flask) -> None:
+    @app.route('/')
+    def serve_frontend():
+        return send_from_directory(app.static_folder, 'index.html')
 
+    @app.route('/static/<path:path>')
+    def static_files(path):
+        return send_from_directory(app.static_folder, path)
 
-@app.route('/static/<path:path>')
-def static_files(path):
-    return send_from_directory(app.static_folder, path)
+    @app.route('/health')
+    def health():
+        load_model()
+        return jsonify(
+            {
+                'status': 'ok',
+                'model_loaded': model is not None and vectorizer is not None,
+                'model_path': str(MODEL_PATH),
+                'vectorizer_path': str(VECT_PATH),
+                'rate_limit_storage': app.config.get('RATELIMIT_STORAGE_URI', 'memory://'),
+            }
+        )
 
-
-@app.route('/health')
-def health():
-    load_model()
-    return jsonify(
-        {
-            'status': 'ok',
-            'model_loaded': model is not None and vectorizer is not None,
-            'model_path': str(MODEL_PATH),
-            'vectorizer_path': str(VECT_PATH),
-        }
-    )
-
-
-@app.route('/fetch-emails')
-@limiter.limit('15/minute')
-def route_fetch_emails():
-    emails = fetch_emails()
-    return jsonify({'count': len(emails), 'emails': emails})
-
-
-@app.route('/analyze', methods=['POST'])
-@limiter.limit('25/minute')
-def analyze():
-    load_model()
-    if model is None or vectorizer is None:
-        return jsonify({'error': 'Model not found. Train model first using training/train_model.py'}), 400
-
-    data = request.get_json() or {}
-    emails = data.get('emails')
-    if emails is None or not isinstance(emails, list):
-        return jsonify({'error': 'Provide JSON body with `emails`: [ {subject, sender, date, body} ]'}), 400
-
-    results = _predict_emails(emails)
-    return jsonify({'results': results, 'summary': _dashboard_from_results(results)})
-
-
-@app.route('/dashboard', methods=['GET', 'POST'])
-def dashboard():
-    load_model()
-    if model is None or vectorizer is None:
-        return jsonify({'error': 'Model not found. Train model first.'}), 400
-
-    if request.method == 'POST':
-        payload = request.get_json() or {}
-        emails = payload.get('emails', [])
-    else:
+    @app.route('/fetch-emails')
+    @limiter.limit('15/minute')
+    def route_fetch_emails():
         emails = fetch_emails()
+        return jsonify({'count': len(emails), 'emails': emails})
 
-    results = _predict_emails(emails)
-    return jsonify(_dashboard_from_results(results))
+    @app.route('/analyze', methods=['POST'])
+    @limiter.limit('25/minute')
+    def analyze():
+        load_model()
+        if model is None or vectorizer is None:
+            return jsonify({'error': 'Model not found. Train model first using training/train_model.py'}), 400
+
+        data = request.get_json() or {}
+        emails = data.get('emails')
+        if emails is None or not isinstance(emails, list):
+            return jsonify({'error': 'Provide JSON body with `emails`: [ {subject, sender, date, body} ]'}), 400
+
+        results = _predict_emails(emails)
+        return jsonify({'results': results, 'summary': _dashboard_from_results(results)})
+
+    @app.route('/dashboard', methods=['GET', 'POST'])
+    def dashboard():
+        load_model()
+        if model is None or vectorizer is None:
+            return jsonify({'error': 'Model not found. Train model first.'}), 400
+
+        if request.method == 'POST':
+            payload = request.get_json() or {}
+            emails = payload.get('emails', [])
+        else:
+            emails = fetch_emails()
+
+        results = _predict_emails(emails)
+        return jsonify(_dashboard_from_results(results))
+
+    @app.route('/reload-model', methods=['POST'])
+    def reload_model():
+        load_model(force_reload=True)
+        if model is None or vectorizer is None:
+            return jsonify({'status': 'error', 'message': 'Model files missing.'}), 400
+        return jsonify({'status': 'ok', 'message': 'Model reloaded successfully.'})
 
 
-@app.route('/reload-model', methods=['POST'])
-def reload_model():
-    load_model(force_reload=True)
-    if model is None or vectorizer is None:
-        return jsonify({'status': 'error', 'message': 'Model files missing.'}), 400
-    return jsonify({'status': 'ok', 'message': 'Model reloaded successfully.'})
+app = create_app()
 
 
 if __name__ == '__main__':
     load_model()
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
