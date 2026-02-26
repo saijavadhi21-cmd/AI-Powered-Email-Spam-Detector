@@ -9,3 +9,5 @@ nltk
 joblib
 flask-cors
 Flask-Limiter
+gunicorn
+redis
