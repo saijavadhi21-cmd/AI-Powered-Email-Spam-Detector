@@ -6,15 +6,27 @@
     "body": "Congratulations! You have been selected to win a free iPhone. Click http://phish.example to claim."
   },
   {
-    "subject": "Meeting notes",
+    "subject": "Meeting notes and next steps",
     "sender": "alice@example.com",
     "date": "2026-02-21",
-    "body": "Here are the meeting notes from today's sync. Please review the attached doc and let me know your thoughts."
+    "body": "Here are the meeting notes from today's sync. Please review the attached doc and share your action items."
   },
   {
-    "subject": "Your invoice is ready",
-    "sender": "billing@service.com",
+    "subject": "Payment failure alert",
+    "sender": "billing-security@unknown-pay.example",
     "date": "2026-02-22",
-    "body": "Your invoice for February is available. View it securely at https://service.example/invoice/12345"
+    "body": "Urgent: your account will be suspended unless you verify payment details immediately at http://danger.example"
+  },
+  {
+    "subject": "Sprint planning reminder",
+    "sender": "pm@company.com",
+    "date": "2026-02-22",
+    "body": "Friendly reminder: sprint planning starts at 10 AM tomorrow in conference room B."
+  },
+  {
+    "subject": "Lottery winnings confirmation",
+    "sender": "lottery@fraud-mail.example",
+    "date": "2026-02-23",
+    "body": "You won 5,000,000 dollars! Share your national ID and bank account to process your payout."
   }
 ]
