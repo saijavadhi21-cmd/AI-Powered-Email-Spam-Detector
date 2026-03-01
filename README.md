@@ -74,6 +74,15 @@ export OAUTH_REDIRECT_URI=https://your-domain.com/oauth2callback
    - ❌ Invalid origin example: `http://localhost:5000/oauth2callback` (path is not allowed in JavaScript origins)
 6. Run server and open `/login`.
 
+### If you see `Error 403: access_denied`
+
+This usually means OAuth consent is not ready for your account yet (not a code bug).
+
+1. Open **Google Cloud Console → APIs & Services → OAuth consent screen**.
+2. If app status is **Testing**, add your Gmail account in **Test users**.
+3. If app should be usable by anyone outside test users, complete consent verification and publish to **Production**.
+4. Verify the callback URL in your OAuth client exactly matches your backend callback (for local default: `http://127.0.0.1:5000/oauth2callback`).
+
 ## Production Deployment
 
 ### Option A: Gunicorn (VM / Render / Railway / Heroku-style)
