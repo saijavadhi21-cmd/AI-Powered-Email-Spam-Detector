@@ -74,6 +74,17 @@ export OAUTH_REDIRECT_URI=https://your-domain.com/oauth2callback
    - ❌ Invalid origin example: `http://localhost:5000/oauth2callback` (path is not allowed in JavaScript origins)
 6. Run server and open `/login`.
 
+### Quick testing mode (skip Google OAuth)
+
+If you only need to test the spam detector quickly (college demo / assignment), you can skip Google login:
+
+1. Start backend normally (`python backend/app.py`).
+2. Open `http://127.0.0.1:5000`.
+3. Click **Use Demo Emails (No Google)**.
+4. Click **Analyze with AI**.
+
+This uses bundled sample inbox data and exercises the full ML pipeline without OAuth setup.
+
 ### If you see `Error 403: access_denied`
 
 This usually means OAuth consent is not ready for your account yet (not a code bug).
