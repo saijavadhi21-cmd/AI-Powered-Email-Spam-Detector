@@ -7,6 +7,7 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_session import Session
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 try:
     from backend import preprocessing
@@ -34,6 +35,12 @@ limiter = Limiter(
 
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=str(BASE_DIR.parent / 'frontend'))
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=int(os.environ.get('PROXY_FIX_X_FOR', '1')),
+        x_proto=int(os.environ.get('PROXY_FIX_X_PROTO', '1')),
+        x_host=int(os.environ.get('PROXY_FIX_X_HOST', '1')),
+    )
     app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-change-me')
     app.config['SESSION_TYPE'] = os.environ.get('SESSION_TYPE', 'filesystem')
     app.config['SESSION_FILE_DIR'] = os.environ.get('SESSION_FILE_DIR', str(BASE_DIR.parent / 'flask_session'))
