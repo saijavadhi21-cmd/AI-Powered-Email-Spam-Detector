@@ -78,6 +78,7 @@
             <h1 class="mt-3 mb-2">Gmail Spam Detector</h1>
             <p class="hero-muted mb-0">Secure inbox scanning with explainable AI scoring and real-time threat insights.</p>
             <p class="hero-muted mb-0 mt-1"><small>OAuth tip: JavaScript origin = base URL only, Redirect URI = full callback with <code class="text-white">/oauth2callback</code>.</small></p>
+            <p class="hero-muted mb-0 mt-1"><small><strong>Need fast testing?</strong> Google login is optional — you can run the full detector using bundled demo emails.</small></p>
           </div>
           <div class="d-flex flex-wrap gap-2 hero-actions">
             <a href="/login" class="btn btn-light btn-soft fw-semibold">Login with Google</a>
@@ -115,6 +116,7 @@
               <button id="fetchBtn" class="btn btn-primary btn-soft">1) Fetch Emails</button>
               <button id="analyzeBtn" class="btn btn-success btn-soft">2) Analyze with AI</button>
               <button id="refreshModelBtn" class="btn btn-outline-dark btn-soft">Reload Model</button>
+              <button id="demoBtn" class="btn btn-outline-primary btn-soft">Try with Stored Emails</button>
             </div>
             <div id="statusBox" class="alert alert-info status-panel py-2">Ready.</div>
             <div class="table-responsive">
@@ -165,9 +167,18 @@
       const logoutBtn = document.getElementById('logoutBtn');
       const oauthHelpBtn = document.getElementById('oauthHelpBtn');
       const refreshModelBtn = document.getElementById('refreshModelBtn');
+      const demoBtn = document.getElementById('demoBtn');
       const statusBox = document.getElementById('statusBox');
       const tbody = document.querySelector('#emailsTable tbody');
       const pieCtx = document.getElementById('pieChart').getContext('2d');
+
+      const FALLBACK_STORED_EMAILS = [
+        { subject: 'Free gift card waiting for you', sender: 'promo@offers-win.example', date: '2026-02-20', body: 'Congratulations winner. Click urgent link to claim your free reward now.' },
+        { subject: 'Weekly project update', sender: 'manager@company.com', date: '2026-02-21', body: 'Please share sprint updates before tomorrow meeting.' },
+        { subject: 'Account verification required', sender: 'security@unknown-pay.example', date: '2026-02-22', body: 'Your account is blocked. Verify password and otp immediately.' },
+        { subject: 'Team lunch plan', sender: 'teammate@example.com', date: '2026-02-23', body: 'Let us meet for team lunch this Friday.' }
+      ];
+      const SPAM_TERMS = ['free', 'winner', 'won', 'lottery', 'urgent', 'verify', 'otp', 'password', 'claim', 'gift', 'suspended', 'click'];
 
       const setStatus = (message, type = 'info') => {
         statusBox.className = `alert alert-${type} status-panel py-2`;
@@ -184,7 +195,10 @@
           setStatus(`Fetched ${emails.length} email(s).`, 'success');
           document.getElementById('totalEmails').textContent = emails.length;
         } catch (e) {
-          setStatus('Unable to fetch emails. Check backend.', 'danger');
+          emails = [...FALLBACK_STORED_EMAILS];
+          renderEmails([]);
+          document.getElementById('totalEmails').textContent = emails.length;
+          setStatus('Backend not reachable. Loaded stored emails for demo mode.', 'warning');
         }
       };
 
@@ -214,7 +228,10 @@
           renderAnalytics(summary);
           setStatus('Analysis complete.', 'success');
         } catch (e) {
-          setStatus('Unable to analyze emails.', 'danger');
+          const local = analyzeLocally(emails);
+          renderEmails(local.results);
+          renderAnalytics(local.summary);
+          setStatus('Backend not reachable. Completed local spam analysis using stored rules.', 'warning');
         }
       };
 
@@ -227,6 +244,21 @@
         } catch (e) {
           setStatus('Unable to reload model.', 'danger');
         }
+      };
+
+      demoBtn.onclick = async () => {
+        setStatus('Loading stored demo emails...', 'info');
+        try {
+          const res = await fetch('/static/stored_emails.json');
+          const data = await res.json();
+          emails = Array.isArray(data) ? data : FALLBACK_STORED_EMAILS;
+        } catch (e) {
+          emails = [...FALLBACK_STORED_EMAILS];
+        }
+
+        renderEmails([]);
+        document.getElementById('totalEmails').textContent = emails.length;
+        setStatus(`Stored email mode ready: loaded ${emails.length} email(s). Click "Analyze with AI" next.`, 'success');
       };
 
       oauthHelpBtn.onclick = async () => {
@@ -273,6 +305,41 @@
           tr.innerHTML = `<td>${escapeHtml(r.subject || '')}</td><td>${escapeHtml(r.sender || '')}</td><td><span class="score-pill">${pct}</span></td><td><span class="badge bg-${badgeClass}">${escapeHtml(r.risk || 'unknown')}</span></td><td>${suspicious}</td>`;
           tbody.appendChild(tr);
         });
+      }
+
+
+      function analyzeLocally(localEmails) {
+        const results = localEmails.map((email) => {
+          const text = `${email.subject || ''} ${email.body || ''} ${email.snippet || ''}`.toLowerCase();
+          const hits = SPAM_TERMS.filter((term) => text.includes(term));
+          const probability = Math.min(0.95, 0.15 + hits.length * 0.12);
+          const label = probability >= 0.5 ? 'spam' : 'not_spam';
+          const risk = probability < 0.3 ? 'low' : probability < 0.7 ? 'medium' : 'high';
+          return {
+            subject: email.subject || '(No Subject)',
+            sender: email.sender || 'Unknown Sender',
+            date: email.date || '',
+            label,
+            probability: Number(probability.toFixed(4)),
+            risk,
+            suspicious_words: hits.slice(0, 6)
+          };
+        });
+
+        return {
+          results,
+          summary: {
+            total_emails: results.length,
+            spam_count: results.filter((r) => r.label === 'spam').length,
+            spam_percentage: results.length ? Number(((results.filter((r) => r.label === 'spam').length / results.length) * 100).toFixed(2)) : 0,
+            top_keywords: Object.entries(
+              results.flatMap((r) => r.suspicious_words).reduce((acc, key) => {
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+              }, {})
+            ).sort((a, b) => b[1] - a[1]).slice(0, 10)
+          }
+        };
       }
 
       function renderAnalytics(stats) {
