@@ -46,6 +46,7 @@ python backend/app.py
 - `GET|POST /dashboard` → analytics summary.
 - `POST /reload-model` → force in-memory model refresh.
 - `GET /login`, `GET /oauth2callback`, `GET /logout` → Google OAuth flow.
+- `GET /oauth/debug` → shows exact redirect URI resolved by backend.
 
 ## Gmail OAuth setup
 
@@ -57,7 +58,14 @@ python backend/app.py
 export CLIENT_SECRETS_FILE=/absolute/path/client_secrets.json
 ```
 
-4. Run server and open `/login`.
+4. Set the callback URI explicitly when deploying behind HTTPS proxy/load balancer:
+
+```bash
+export OAUTH_REDIRECT_URI=https://your-domain.com/oauth2callback
+```
+
+5. In Google Cloud Console, add the exact callback URL shown by `GET /oauth/debug` to **Authorized redirect URIs**.
+6. Run server and open `/login`.
 
 ## Production Deployment
 
@@ -89,6 +97,7 @@ docker run --env-file .env -p 5000:5000 gmail-spam-detector
 - `CORS_ORIGINS` (your frontend domain)
 - `CLIENT_SECRETS_FILE` (absolute path in runtime)
 - `RATE_LIMIT_STORAGE_URI` (Redis URL, e.g. `redis://host:6379/0`)
+- `OAUTH_REDIRECT_URI` (recommended for production to avoid redirect URI mismatch)
 
 ## Model details
 
