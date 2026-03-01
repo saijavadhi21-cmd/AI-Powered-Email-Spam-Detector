@@ -78,6 +78,7 @@
             <h1 class="mt-3 mb-2">Gmail Spam Detector</h1>
             <p class="hero-muted mb-0">Secure inbox scanning with explainable AI scoring and real-time threat insights.</p>
             <p class="hero-muted mb-0 mt-1"><small>OAuth tip: JavaScript origin = base URL only, Redirect URI = full callback with <code class="text-white">/oauth2callback</code>.</small></p>
+            <p class="hero-muted mb-0 mt-1"><small><strong>Need fast testing?</strong> Google login is optional — you can run the full detector using bundled demo emails.</small></p>
           </div>
           <div class="d-flex flex-wrap gap-2 hero-actions">
             <a href="/login" class="btn btn-light btn-soft fw-semibold">Login with Google</a>
@@ -115,6 +116,7 @@
               <button id="fetchBtn" class="btn btn-primary btn-soft">1) Fetch Emails</button>
               <button id="analyzeBtn" class="btn btn-success btn-soft">2) Analyze with AI</button>
               <button id="refreshModelBtn" class="btn btn-outline-dark btn-soft">Reload Model</button>
+              <button id="demoBtn" class="btn btn-outline-primary btn-soft">Use Demo Emails (No Google)</button>
             </div>
             <div id="statusBox" class="alert alert-info status-panel py-2">Ready.</div>
             <div class="table-responsive">
@@ -165,6 +167,7 @@
       const logoutBtn = document.getElementById('logoutBtn');
       const oauthHelpBtn = document.getElementById('oauthHelpBtn');
       const refreshModelBtn = document.getElementById('refreshModelBtn');
+      const demoBtn = document.getElementById('demoBtn');
       const statusBox = document.getElementById('statusBox');
       const tbody = document.querySelector('#emailsTable tbody');
       const pieCtx = document.getElementById('pieChart').getContext('2d');
@@ -226,6 +229,20 @@
           setStatus(data.message || 'Model reloaded.', res.ok ? 'success' : 'danger');
         } catch (e) {
           setStatus('Unable to reload model.', 'danger');
+        }
+      };
+
+      demoBtn.onclick = async () => {
+        setStatus('Loading bundled demo emails (no Google login)...', 'info');
+        try {
+          const res = await fetch('/fetch-emails');
+          const data = await res.json();
+          emails = data.emails || [];
+          renderEmails([]);
+          setStatus(`Demo mode ready: loaded ${emails.length} email(s). Click "Analyze with AI" next.`, 'success');
+          document.getElementById('totalEmails').textContent = emails.length;
+        } catch (e) {
+          setStatus('Unable to load demo emails.', 'danger');
         }
       };
 

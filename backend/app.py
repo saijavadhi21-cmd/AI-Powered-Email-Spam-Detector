@@ -27,6 +27,18 @@ model = None
 vectorizer = None
 
 
+def _patch_legacy_model(loaded_model):
+    """Patch known sklearn pickle compatibility gaps for older artifacts."""
+    if loaded_model is None:
+        return loaded_model
+
+    # sklearn version mismatch can miss this attribute on older LogisticRegression pickles.
+    if hasattr(loaded_model, 'predict_proba') and not hasattr(loaded_model, 'multi_class'):
+        loaded_model.multi_class = 'auto'
+
+    return loaded_model
+
+
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=['200 per day', '50 per hour'],
@@ -65,7 +77,7 @@ def load_model(force_reload: bool = False):
     if model is not None and vectorizer is not None and not force_reload:
         return
     if MODEL_PATH.exists() and VECT_PATH.exists():
-        model = joblib.load(MODEL_PATH)
+        model = _patch_legacy_model(joblib.load(MODEL_PATH))
         vectorizer = joblib.load(VECT_PATH)
     else:
         model = None
@@ -78,8 +90,11 @@ def _predict_emails(emails):
 
     bodies = [preprocessing.clean_text(e.get('body', '') or e.get('snippet', '')) for e in emails]
     X = vectorizer.transform(bodies)
-    probs = model.predict_proba(X)
-    labels = list(model.classes_)
+    try:
+        probs = model.predict_proba(X)
+        labels = list(model.classes_)
+    except Exception as exc:
+        raise RuntimeError(f'Model inference failed: {exc}') from exc
     spam_idx = labels.index('spam') if 'spam' in labels else -1
 
     feature_names = []
@@ -179,7 +194,11 @@ def register_routes(app: Flask) -> None:
         if emails is None or not isinstance(emails, list):
             return jsonify({'error': 'Provide JSON body with `emails`: [ {subject, sender, date, body} ]'}), 400
 
-        results = _predict_emails(emails)
+        try:
+            results = _predict_emails(emails)
+        except RuntimeError as exc:
+            return jsonify({'error': str(exc), 'hint': 'Re-train model using `python training/train_model.py` for your local sklearn version.'}), 400
+
         return jsonify({'results': results, 'summary': _dashboard_from_results(results)})
 
     @app.route('/dashboard', methods=['GET', 'POST'])
@@ -194,7 +213,11 @@ def register_routes(app: Flask) -> None:
         else:
             emails = fetch_emails()
 
-        results = _predict_emails(emails)
+        try:
+            results = _predict_emails(emails)
+        except RuntimeError as exc:
+            return jsonify({'error': str(exc), 'hint': 'Re-train model using `python training/train_model.py` for your local sklearn version.'}), 400
+
         return jsonify(_dashboard_from_results(results))
 
     @app.route('/reload-model', methods=['POST'])
