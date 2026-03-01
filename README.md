@@ -64,7 +64,14 @@ export CLIENT_SECRETS_FILE=/absolute/path/client_secrets.json
 export OAUTH_REDIRECT_URI=https://your-domain.com/oauth2callback
 ```
 
-5. In Google Cloud Console, add the exact callback URL shown by `GET /oauth/debug` to **Authorized redirect URIs**.
+5. In Google Cloud Console OAuth client settings, configure both sections correctly:
+   - **Authorized JavaScript origins** (no path allowed):
+     - `http://localhost:5000`
+     - `http://127.0.0.1:5000`
+   - **Authorized redirect URIs** (must include callback path):
+     - `http://localhost:5000/oauth2callback`
+     - `http://127.0.0.1:5000/oauth2callback`
+   - ❌ Invalid origin example: `http://localhost:5000/oauth2callback` (path is not allowed in JavaScript origins)
 6. Run server and open `/login`.
 
 ## Production Deployment
