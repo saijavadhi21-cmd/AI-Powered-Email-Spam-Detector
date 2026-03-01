@@ -1,7 +1,7 @@
 import os
 from urllib.parse import urlparse
 
-from flask import Blueprint, redirect, request, session, url_for, jsonify
+from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 
 bp = Blueprint('auth', __name__)
@@ -27,12 +27,13 @@ def _resolve_redirect_uri() -> str:
     return f'{forwarded_proto}://{forwarded_host}{callback_path}'
 
 
+def _local_origin_examples() -> list[str]:
+    return ['http://localhost:5000', 'http://127.0.0.1:5000']
+
+
 def _local_redirect_examples() -> list[str]:
     callback_path = url_for('auth.oauth2callback')
-    return [
-        f'http://localhost:5000{callback_path}',
-        f'http://127.0.0.1:5000{callback_path}',
-    ]
+    return [f'http://localhost:5000{callback_path}', f'http://127.0.0.1:5000{callback_path}']
 
 
 def _validate_redirect_shape(uri: str) -> str | None:
@@ -52,7 +53,17 @@ def login():
     redirect_uri = _resolve_redirect_uri()
     redirect_error = _validate_redirect_shape(redirect_uri)
     if redirect_error:
-        return jsonify({'error': redirect_error, 'resolved_redirect_uri': redirect_uri, 'expected_examples': _local_redirect_examples()}), 400
+        return (
+            jsonify(
+                {
+                    'error': redirect_error,
+                    'resolved_redirect_uri': redirect_uri,
+                    'expected_redirect_examples': _local_redirect_examples(),
+                    'expected_javascript_origins': _local_origin_examples(),
+                }
+            ),
+            400,
+        )
 
     flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES)
     flow.redirect_uri = redirect_uri
@@ -69,16 +80,25 @@ def oauth2callback():
     redirect_uri = _resolve_redirect_uri()
     redirect_error = _validate_redirect_shape(redirect_uri)
     if redirect_error:
-        return jsonify({'error': redirect_error, 'resolved_redirect_uri': redirect_uri, 'expected_examples': _local_redirect_examples()}), 400
+        return (
+            jsonify(
+                {
+                    'error': redirect_error,
+                    'resolved_redirect_uri': redirect_uri,
+                    'expected_redirect_examples': _local_redirect_examples(),
+                    'expected_javascript_origins': _local_origin_examples(),
+                }
+            ),
+            400,
+        )
 
     state = session.get('oauth_state')
     flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
     flow.redirect_uri = redirect_uri
-    authorization_response = request.url
-    flow.fetch_token(authorization_response=authorization_response)
+    flow.fetch_token(authorization_response=request.url)
     creds = flow.credentials
-    with open(TOKEN_PATH, 'w') as f:
-        f.write(creds.to_json())
+    with open(TOKEN_PATH, 'w') as token_file:
+        token_file.write(creds.to_json())
     return jsonify({'message': 'OAuth completed and token saved to backend/token.json'})
 
 
@@ -104,8 +124,9 @@ def oauth_debug():
             'request_host': request.host,
             'x_forwarded_proto': request.headers.get('X-Forwarded-Proto', ''),
             'x_forwarded_host': request.headers.get('X-Forwarded-Host', ''),
-            'local_redirect_examples': _local_redirect_examples(),
-            'google_console_tip': 'Add the exact resolved_redirect_uri value (including /oauth2callback) under Authorized redirect URIs in Google Cloud Console.',
+            'expected_javascript_origins': _local_origin_examples(),
+            'expected_redirect_uris': _local_redirect_examples(),
+            'google_console_tip': 'Use origins without path in Authorized JavaScript origins, and callback URLs with /oauth2callback in Authorized redirect URIs.',
             'resolved_shape_error': _validate_redirect_shape(resolved),
         }
     )
