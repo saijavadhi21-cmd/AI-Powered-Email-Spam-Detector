@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
+from google.auth.exceptions import GoogleAuthError
 
 bp = Blueprint('auth', __name__)
 
@@ -92,10 +93,47 @@ def oauth2callback():
             400,
         )
 
+    oauth_error = request.args.get('error', '').strip()
+    if oauth_error:
+        error_description = request.args.get('error_description', '').strip()
+        guidance = [
+            'Open Google Cloud Console → APIs & Services → OAuth consent screen.',
+            'If app is in Testing mode, add your Gmail address under Test users.',
+            'If app is External and used by anyone, complete verification/publish to Production.',
+            'Ensure redirect URI in OAuth client exactly matches resolved_redirect_uri.',
+        ]
+        return (
+            jsonify(
+                {
+                    'error': f'OAuth provider returned error: {oauth_error}',
+                    'error_description': error_description,
+                    'resolved_redirect_uri': redirect_uri,
+                    'guidance': guidance,
+                }
+            ),
+            400,
+        )
+
     state = session.get('oauth_state')
     flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
     flow.redirect_uri = redirect_uri
-    flow.fetch_token(authorization_response=request.url)
+    try:
+        flow.fetch_token(authorization_response=request.url)
+    except GoogleAuthError as exc:
+        return (
+            jsonify(
+                {
+                    'error': 'Failed to exchange OAuth authorization code for token.',
+                    'details': str(exc),
+                    'resolved_redirect_uri': redirect_uri,
+                    'guidance': [
+                        'Make sure your account is listed as a Test user on OAuth consent screen.',
+                        'Confirm Authorized redirect URIs include this exact callback URL.',
+                    ],
+                }
+            ),
+            400,
+        )
     creds = flow.credentials
     with open(TOKEN_PATH, 'w') as token_file:
         token_file.write(creds.to_json())

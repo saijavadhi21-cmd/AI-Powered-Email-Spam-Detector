@@ -33,6 +33,16 @@ python training/train_model.py
 python backend/app.py
 ```
 
+
+> **Windows (PowerShell) note:** if `python` is not recognized but Python is installed, use `py` instead.
+>
+> ```powershell
+> py -m venv .venv
+> .venv\Scripts\Activate.ps1
+> py -m pip install -r requirements.txt
+> py backend\app.py
+> ```
+
 4. **Open app**
 
 - http://127.0.0.1:5000
@@ -73,6 +83,26 @@ export OAUTH_REDIRECT_URI=https://your-domain.com/oauth2callback
      - `http://127.0.0.1:5000/oauth2callback`
    - ❌ Invalid origin example: `http://localhost:5000/oauth2callback` (path is not allowed in JavaScript origins)
 6. Run server and open `/login`.
+
+### Quick testing mode (skip Google OAuth)
+
+If you only need to test the spam detector quickly (college demo / assignment), you can skip Google login:
+
+1. Start backend normally (`python backend/app.py`).
+2. Open `http://127.0.0.1:5000`.
+3. Click **Try with Stored Emails**.
+4. Click **Analyze with AI**.
+
+This uses bundled sample inbox data and exercises the full ML pipeline without OAuth setup.
+
+### If you see `Error 403: access_denied`
+
+This usually means OAuth consent is not ready for your account yet (not a code bug).
+
+1. Open **Google Cloud Console → APIs & Services → OAuth consent screen**.
+2. If app status is **Testing**, add your Gmail account in **Test users**.
+3. If app should be usable by anyone outside test users, complete consent verification and publish to **Production**.
+4. Verify the callback URL in your OAuth client exactly matches your backend callback (for local default: `http://127.0.0.1:5000/oauth2callback`).
 
 ## Production Deployment
 

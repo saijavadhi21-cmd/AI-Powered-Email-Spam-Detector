@@ -1,0 +1,42 @@
+[
+  {
+    "id": "demo-1",
+    "subject": "Congratulations! Claim your free iPhone",
+    "sender": "promo@offers-win.example",
+    "date": "2026-02-20",
+    "body": "You are selected as lucky winner. Click urgent link to claim free gift card now.",
+    "snippet": "Claim your prize now"
+  },
+  {
+    "id": "demo-2",
+    "subject": "Project review meeting notes",
+    "sender": "alice@example.com",
+    "date": "2026-02-21",
+    "body": "Thanks for attending today's review. Attached are notes and action items for tomorrow.",
+    "snippet": "Meeting notes attached"
+  },
+  {
+    "id": "demo-3",
+    "subject": "URGENT: Account suspended",
+    "sender": "security-alert@unknown-pay.example",
+    "date": "2026-02-22",
+    "body": "Your account is suspended. Verify password immediately to avoid permanent block.",
+    "snippet": "Verify account immediately"
+  },
+  {
+    "id": "demo-4",
+    "subject": "Invoice for February",
+    "sender": "finance@company.com",
+    "date": "2026-02-23",
+    "body": "Please find attached invoice and payment summary for February.",
+    "snippet": "Invoice attached"
+  },
+  {
+    "id": "demo-5",
+    "subject": "Lottery winnings confirmation",
+    "sender": "lottery@fraud-mail.example",
+    "date": "2026-02-24",
+    "body": "You won million dollars lottery. Send bank details and OTP to release funds.",
+    "snippet": "You won the lottery"
+  }
+]
